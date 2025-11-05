@@ -30,9 +30,13 @@ information will be deleted after submission and grading of this project.
 current_index = 0
 dimension_liste = []
 counter_label = None
+start_time =  None
+result_file = None
 
 import tkinter as tk
 import random
+import os
+import time
 
 window = tk.Tk()
 
@@ -45,8 +49,39 @@ click_started_on_circle = False
 
 #TEST PAGE
 
+# Function to create a unique file for the result
+def create_unique_file(name, extension=".txt"):
+    file_name = name + extension
+    counter = 1
+
+    # As long as the file exists, the counter is incremented
+    while os.path.exists(file_name):
+        file_name = f"{name}_{counter}{extension}"
+        counter += 1
+
+    # Create new file
+    with open(file_name, "w") as f:
+        f.write("File " + str(counter) + " :\n")
+
+    print(f"Fichier créé : {file_name}")
+    return file_name
+
 #deals with data after circle is clicked
 def Circle_Clicked():
+    global start_time, result_file, current_index, dimension_liste
+
+    # When the circle is clic it stop the time, then we do the differences to have the time
+    end_time = time.time()
+    elapsed_time = (end_time-start_time) * 1000 # millisecondes conversion
+ 
+    # We print the result in the file, maybe we have to change the syntax to have an easier export
+    distance = dimension_liste[current_index - 1][0]
+    size = dimension_liste[current_index - 1][1]
+    direction = dimension_liste[current_index - 1][2]
+    with open(result_file, "a") as f:
+        f.write(f"{current_index}, {distance}, {size}, {direction}, {elapsed_time:.2f}\n")
+    
+    print(f"Circle clicked! Time: {elapsed_time:.2f}ms")
     print("Circle clicked!")
     canvas.delete("circle")
 
@@ -65,7 +100,7 @@ def Update_Counter():
 
 #creates clickable circle of varying sizes, distances, and directions
 def Create_Circle(midStart):
-    global current_index, dimension_liste, click_started_on_circle
+    global current_index, dimension_liste, click_started_on_circle, start_time
 
     if(current_index == 0):
         dimension_liste = [(8,8,"left"),(8,4,"left"),(8,2,"left"),(8,1,"left"),(16,8,"left"),(16,4,"left"),(16,2,"left"),(16,1,"left"),(32,8,"left"),(32,4,"left"),(32,2,"left"),(32,1,"left"),(64,8,"left"),(64,4,"left"),(64,2,"left"),(64,1,"left"),(8,8,"right"),(8,4,"right"),(8,2,"right"),(8,1,"right"),(16,8,"right"),(16,4,"right"),(16,2,"right"),(16,1,"right"),(32,8,"right"),(32,4,"right"),(32,2,"right"),(32,1,"right"),(64,8,"right"),(64,4,"right"),(64,2,"right"),(64,1,"right")]
@@ -75,6 +110,8 @@ def Create_Circle(midStart):
         print("Test completed")
         return
     
+    start_time = time.time()
+
     # update counter
     Update_Counter() 
 
@@ -118,7 +155,11 @@ def Create_Circle(midStart):
 
 #red button to create new circle and center mouse
 def Run_Test():
-    global midStart_window
+    global midStart_window, result_file
+
+    # creation of a new file for each test
+    result_file = create_unique_file("Fitts_Law_results")
+
     midStart = tk.Button(canvas, text="X", bg="red", fg="white")
     midStart_window = canvas.create_window(
         window.winfo_width()//2, window.winfo_height()//2,
@@ -146,3 +187,4 @@ window.after(100, Show_Consent)
 
 
 window.mainloop()
+
