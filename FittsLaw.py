@@ -30,27 +30,35 @@ information will be deleted after submission and grading of this project.
 current_index = 0
 dimension_liste = []
 counter_label = None
-start_time =  None
+start_time = None
 result_file = None
+current_block = 0
+circle_active = False
+error_occurred = False
 
 import tkinter as tk
 import random
 import os
 import time
-
+import csv
 window = tk.Tk()
 
 window.title("Fitts' Law Test")
-window.state('zoomed')  # mode plein écran
+window.state('zoomed')  # full screen mode
 canvas = tk.Canvas(window, bg="white")
 canvas.pack(fill="both", expand=True)
-
-click_started_on_circle = False
-
 #TEST PAGE
 
+# track clicks outside the circle
+def register_error(event):
+    global error_occurred, circle_active
+    if circle_active:
+        error_occurred = True
+
+canvas.bind("<Button-1>", register_error)
+
 # Function to create a unique file for the result
-def create_unique_file(name, extension=".txt"):
+def create_unique_file(name, extension=".csv"):
     file_name = name + extension
     counter = 1
 
@@ -60,15 +68,14 @@ def create_unique_file(name, extension=".txt"):
         counter += 1
 
     # Create new file
-    with open(file_name, "w") as f:
-        f.write("File " + str(counter) + " :\n")
-
-    print(f"Fichier créé : {file_name}")
+    with open(file_name, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["Block", "Trial", "Distance", "Size", "Direction", "Time (ms)", "Errors"])
     return file_name
 
 #deals with data after circle is clicked
-def Circle_Clicked():
-    global start_time, result_file, current_index, dimension_liste
+def Circle_Clicked(event=None):
+    global start_time, result_file, current_index, dimension_liste, error_occurred, circle_active
 
     # When the circle is clic it stop the time, then we do the differences to have the time
     end_time = time.time()
@@ -78,18 +85,20 @@ def Circle_Clicked():
     distance = dimension_liste[current_index - 1][0]
     size = dimension_liste[current_index - 1][1]
     direction = dimension_liste[current_index - 1][2]
-    with open(result_file, "a") as f:
-        f.write(f"{current_index}, {distance}, {size}, {direction}, {elapsed_time:.2f}\n")
-    
+    with open(result_file, "a", newline="") as f:
+        writer= csv.writer(f)
+        writer.writerow([current_block + 1, current_index, distance, size, direction, f"{elapsed_time:.2f}", error_occurred])    
     print(f"Circle clicked! Time: {elapsed_time:.2f}ms")
     print("Circle clicked!")
     canvas.delete("circle")
+    error_occurred = False
+    circle_active = False
 
 
 # function to update the counter in the top of the page
 def Update_Counter():
     global counter_label
-    counter_text = f"Test {current_index + 1} / {len(dimension_liste)}"
+    counter_text = f"Test Block : {current_block + 1}\nTrial {current_index + 1} / {len(dimension_liste)}"
     if counter_label is None:
         # Label creation for the first time
         counter_label = tk.Label(canvas, text=counter_text, font=("Arial", 16), bg="white")
@@ -100,19 +109,26 @@ def Update_Counter():
 
 #creates clickable circle of varying sizes, distances, and directions
 def Create_Circle(midStart):
-    global current_index, dimension_liste, click_started_on_circle, start_time
+    global current_index, dimension_liste, click_started_on_circle, start_time, current_block, circle_active, error_occurred
 
     if(current_index == 0):
         dimension_liste = [(8,8,"left"),(8,4,"left"),(8,2,"left"),(8,1,"left"),(16,8,"left"),(16,4,"left"),(16,2,"left"),(16,1,"left"),(32,8,"left"),(32,4,"left"),(32,2,"left"),(32,1,"left"),(64,8,"left"),(64,4,"left"),(64,2,"left"),(64,1,"left"),(8,8,"right"),(8,4,"right"),(8,2,"right"),(8,1,"right"),(16,8,"right"),(16,4,"right"),(16,2,"right"),(16,1,"right"),(32,8,"right"),(32,4,"right"),(32,2,"right"),(32,1,"right"),(64,8,"right"),(64,4,"right"),(64,2,"right"),(64,1,"right")]
         random.shuffle(dimension_liste)
     
-    if current_index >= len(dimension_liste):
+    if current_index > len(dimension_liste) - 1:
         print("Test completed")
+        current_index = 0
+        current_block += 1
         return
     
-    start_time = time.time()
-
+    if current_block == 2: # stop the test after 10 blocks of 32 trials have been run , exit message + user can close the program
+        canvas.delete("all")
+        final_message = f"You have successfully completed all 10 test blocks.\nYour Results have been written to the \"{result_file}\" file for data collection.\nThank you!"
+        completion_label = tk.Label(canvas,text=final_message, font=("Arial", 16), bg="white")
+        canvas.create_window(window.winfo_width()/2, window.winfo_height()//2-50, window=completion_label)
+        return
     # update counter
+    
     Update_Counter() 
 
     #remove any previous circle buttons if needed
@@ -149,9 +165,9 @@ def Create_Circle(midStart):
     canvas.tag_bind(circle, "<Button-1>", lambda e: Circle_Clicked())
     canvas.itemconfig(circle, tags=("circle",))  #tag for easy deletion next time
 
-
-    # Reset in case of a wrong clic
-    click_started_on_circle = False
+    error_occurred = False
+    circle_active = True
+    start_time = time.time()
 
 #red button to create new circle and center mouse
 def Run_Test():
@@ -184,7 +200,4 @@ def Show_Consent():
 
 #delay until window is rendered
 window.after(100, Show_Consent)
-
-
 window.mainloop()
-
