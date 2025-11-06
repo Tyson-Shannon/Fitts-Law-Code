@@ -121,7 +121,7 @@ def Create_Circle(midStart):
         current_block += 1
         return
     
-    if current_block == 2: # stop the test after 10 blocks of 32 trials have been run , exit message + user can close the program
+    if current_block == 10: # stop the test after 10 blocks of 32 trials have been run , exit message + user can close the program
         canvas.delete("all")
         final_message = f"You have successfully completed all 10 test blocks.\nYour Results have been written to the \"{result_file}\" file for data collection.\nThank you!"
         completion_label = tk.Label(canvas,text=final_message, font=("Arial", 16), bg="white")
