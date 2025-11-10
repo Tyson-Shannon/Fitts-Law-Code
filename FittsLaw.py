@@ -4,6 +4,11 @@ Minnesota State University, Mankato
 Fitts' Law Project
 Hugo Albanese, Tyson Shannon, Julissa Paramo
 '''
+import tkinter as tk
+import random
+import os
+import time
+import csv
 
 # Global variable
 consentWords = """
@@ -34,28 +39,51 @@ start_time = None
 result_file = None
 current_block = 0
 circle_active = False
-error_occurred = False
 
-import tkinter as tk
-import random
-import os
-import time
-import csv
+error_count = 0
+
 window = tk.Tk()
-
 window.title("Fitts' Law Test")
 window.state('zoomed')  # full screen mode
 canvas = tk.Canvas(window, bg="white")
 canvas.pack(fill="both", expand=True)
+
 #TEST PAGE
 
-# track clicks outside the circle
-def register_error(event):
-    global error_occurred, circle_active
-    if circle_active:
-        error_occurred = True
+def log_trial(hit):
+    global result_file, dimension_liste, current_index, start_time, error_count
 
-canvas.bind("<Button-1>", register_error)
+    if current_index == 0: # result should not be logged yet here
+        return
+        # When the circle is clic it stop the time, then we do the differences to have the time
+    end_time = time.time()
+    elapsed_time = (end_time-start_time) * 1000 # millisecondes conversion
+ 
+    # We print the result in the file, maybe we have to change the syntax to have an easier export
+    distance = dimension_liste[current_index - 1][0]
+    size = dimension_liste[current_index - 1][1]
+    direction = dimension_liste[current_index - 1][2]
+
+    # write each data column
+    with open(result_file, "a", newline="") as f:
+        writer= csv.writer(f)
+        writer.writerow([current_block + 1, current_index, distance, size, direction, f"{elapsed_time:.2f}", error_count, hit])    
+    
+    start_time = None # reset for next trial logging
+    error_count = 0
+
+def register_error(event):
+    global error_count, circle_active
+    if not circle_active:
+        return
+    current = canvas.find_withtag("current")
+    if current:
+        tags = canvas.gettags(current[0])
+        if "circle" in tags:
+            return
+    error_count += 1
+
+canvas.bind("<Button-1>", register_error) 
 
 # Function to create a unique file for the result
 def create_unique_file(name, extension=".csv"):
@@ -70,30 +98,18 @@ def create_unique_file(name, extension=".csv"):
     # Create new file
     with open(file_name, "w", newline="") as f:
         writer = csv.writer(f)
-        writer.writerow(["Block", "Trial", "Distance", "Size", "Direction", "Time (ms)", "Errors"])
+        writer.writerow(["Block", "Trial", "Distance", "Size", "Direction", "Time (ms)", "Errors", "Hit"])
     return file_name
 
-#deals with data after circle is clicked
+#triggers the log trial method if a circle is clicked and resets canvas
 def Circle_Clicked(event=None):
-    global start_time, result_file, current_index, dimension_liste, error_occurred, circle_active
-
-    # When the circle is clic it stop the time, then we do the differences to have the time
-    end_time = time.time()
-    elapsed_time = (end_time-start_time) * 1000 # millisecondes conversion
- 
-    # We print the result in the file, maybe we have to change the syntax to have an easier export
-    distance = dimension_liste[current_index - 1][0]
-    size = dimension_liste[current_index - 1][1]
-    direction = dimension_liste[current_index - 1][2]
-    with open(result_file, "a", newline="") as f:
-        writer= csv.writer(f)
-        writer.writerow([current_block + 1, current_index, distance, size, direction, f"{elapsed_time:.2f}", error_occurred])    
-    print(f"Circle clicked! Time: {elapsed_time:.2f}ms")
+    global circle_active
+    if not circle_active:
+        return
+    log_trial(hit=True)
     print("Circle clicked!")
     canvas.delete("circle")
-    error_occurred = False
     circle_active = False
-
 
 # function to update the counter in the top of the page
 def Update_Counter():
@@ -109,7 +125,13 @@ def Update_Counter():
 
 #creates clickable circle of varying sizes, distances, and directions
 def Create_Circle(midStart):
-    global current_index, dimension_liste, click_started_on_circle, start_time, current_block, circle_active, error_occurred
+    global current_index, dimension_liste, start_time, current_block, circle_active
+
+    # if the user did not click the circle
+    if circle_active:
+        canvas.delete("circle")
+        circle_active = False
+        log_trial(hit=False)
 
     if(current_index == 0):
         dimension_liste = [(8,8,"left"),(8,4,"left"),(8,2,"left"),(8,1,"left"),(16,8,"left"),(16,4,"left"),(16,2,"left"),(16,1,"left"),(32,8,"left"),(32,4,"left"),(32,2,"left"),(32,1,"left"),(64,8,"left"),(64,4,"left"),(64,2,"left"),(64,1,"left"),(8,8,"right"),(8,4,"right"),(8,2,"right"),(8,1,"right"),(16,8,"right"),(16,4,"right"),(16,2,"right"),(16,1,"right"),(32,8,"right"),(32,4,"right"),(32,2,"right"),(32,1,"right"),(64,8,"right"),(64,4,"right"),(64,2,"right"),(64,1,"right")]
@@ -165,7 +187,6 @@ def Create_Circle(midStart):
     canvas.tag_bind(circle, "<Button-1>", lambda e: Circle_Clicked())
     canvas.itemconfig(circle, tags=("circle",))  #tag for easy deletion next time
 
-    error_occurred = False
     circle_active = True
     start_time = time.time()
 
