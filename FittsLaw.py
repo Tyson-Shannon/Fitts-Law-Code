@@ -39,6 +39,7 @@ start_time = None
 result_file = None
 current_block = 0
 circle_active = False
+click_started_in_circle = False
 
 error_count = 0
 
@@ -73,17 +74,23 @@ def log_trial(hit):
     error_count = 0
 
 def register_error(event):
-    global error_count, circle_active
+    global error_count, circle_active, click_started_in_circle
     if not circle_active:
         return
-    current = canvas.find_withtag("current")
-    if current:
-        tags = canvas.gettags(current[0])
+    
+    # Check that we clic the circle
+    items_at_click = canvas.find_overlapping(event.x, event.y, event.x, event.y)
+    for item in items_at_click:
+        tags = canvas.gettags(item)
         if "circle" in tags:
-            return
+            return  # C'est le cercle, pas une erreur
+    
+    # Here it's that we clic outside of the circle
     error_count += 1
+    click_started_in_circle = False  # Reset because outside of the circle
+    print(f"Error! Total errors: {error_count}")
 
-canvas.bind("<Button-1>", register_error) 
+canvas.bind("<ButtonPress-1>", register_error) 
 
 # Function to create a unique file for the result
 def create_unique_file(name, extension=".csv"):
@@ -110,6 +117,31 @@ def Circle_Clicked(event=None):
     print("Circle clicked!")
     canvas.delete("circle")
     circle_active = False
+
+def on_circle_press(event):
+    global click_started_in_circle
+    click_started_in_circle = True
+    print("Pressed in circle")
+
+def on_circle_release(event):
+    global click_started_in_circle, error_count
+    if not click_started_in_circle:
+        return
+    
+    # Check that the cursor is still in the circle at the moment of release.
+    circle_items = canvas.find_withtag("circle")
+    if circle_items:
+        x1, y1, x2, y2 = canvas.coords(circle_items[0])
+        if x1 <= event.x <= x2 and y1 <= event.y <= y2:
+            Circle_Clicked()
+            print("Released in circle - VALID")
+        else:
+            error_count += 1
+            print("Released outside circle - INVALID")
+    
+    click_started_in_circle = False
+
+canvas.bind("<ButtonRelease-1>", on_circle_release)
 
 # function to update the counter in the top of the page
 def Update_Counter():
@@ -184,7 +216,9 @@ def Create_Circle(midStart):
         fill="blue", outline=""
     )
     #detect clicks on circle
-    canvas.tag_bind(circle, "<Button-1>", lambda e: Circle_Clicked())
+    #canvas.tag_bind(circle, "<Button-1>", lambda e: Circle_Clicked())
+    canvas.tag_bind(circle, "<ButtonPress-1>", on_circle_press)
+    #canvas.tag_bind(circle, "<ButtonRelease-1>", on_circle_release)
     canvas.itemconfig(circle, tags=("circle",))  #tag for easy deletion next time
 
     circle_active = True
